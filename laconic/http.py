@@ -66,17 +66,17 @@ class Request(BaseRequest, CommonRequestDescriptorsMixin, ETagRequestMixin,
         except ValueError:
             pass
 
-    @property
-    def param(self):
-        """
-        Combined dictionary containing all request parameters except headers
-        """
-        if not hasattr(self, '_param'):
-            locations = [self.args, self.cookies]
-            if self.method in ('POST', 'PUT', 'PATCH'):
-                locations = [self.json, self.form, self.files] + locations
-            self._param = CombinedDict(locations)
-        return self._param
+    # @property
+    # def param(self):
+    #     """
+    #     Combined dictionary containing all request parameters except headers
+    #     """
+    #     if not hasattr(self, '_param'):
+    #         locations = [self.args, self.cookies]
+    #         if self.method in ('POST', 'PUT', 'PATCH'):
+    #             locations = [self.json, self.form, self.files] + locations
+    #         self._param = CombinedDict(locations)
+    #     return self._param
 
 
 class Response(BaseResponse, CommonResponseDescriptorsMixin, ETagResponseMixin):

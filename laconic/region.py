@@ -1,7 +1,12 @@
 """
-App region
+App region.
 
-...
+This module defines the app region, a group of related endpoints forming a
+distinct part of the app, identified by a common URL prefix.
+
+Classes:
+    Region - The app region class
+
 
 Copyright:  (c) Zvonimir Jurelinac 2018
 License:    MIT, see LICENSE for more details
@@ -9,28 +14,48 @@ License:    MIT, see LICENSE for more details
 
 import functools
 
+from collections.abc import Sequence
+
 from .routing import Endpoint
 from .util import AttributeScope, SortedList
 
 
 class Region:
-    """"""
+    """The Region object groups a set of related endpoints in a single whole.
+
+    Endpoints belonging to the same group share a common URL prefix (potentially
+    with variable URL sections), and can have shared configuration parameters,
+    error handlers etc.
+
+    Attributes:
+        name (str): The name of the app region
+        routes (Sequence): A sequence of routes belonging to this region
+            (a shorthand definition). Each route is defined as a tuple ()
+        exc_handlers (Sequence): A sequence of exception handlers for this
+            region
+        **kwargs: Optional configuration parameters shared between all routes
+            belonging to this region
+    """
 
     #__slots__ = []
 
-    def __init__(self, name, routes=None, **kwargs):
-        self._name = name
+    def __init__(self, name, routes=None, exc_handlers=None, **kwargs):
+        self.name = name
 
-        self._endpoints = {}
-        self._subregions = {}
-        self._attrs = AttributeScope(exception_handlers=[], **kwargs)
+        self.routes = {}
+        self.subregions = {}
+        # self._exception_handlers =
+        self.attrs = AttributeScope(**kwargs)
 
         if routes is not None:
             self.add_routes(routes)
 
+        if exception_handlers is not None:
+            self.add_exception_handlers(handlers)
+
     # Methods for adding regions, routes and exception handlers
 
-    def add_region(self, ):
+    def add_region(self, region):
         """"""
 
     def add_regions(self, regions):
@@ -40,6 +65,7 @@ class Region:
 
     def add_route(self, url_rule, endpoint, methods=None, **kwargs):
         """"""
+        self.routes.append((url_rule, methods, Endpoint(endpoint, **kwargs)))
 
     def add_routes(self, routes):
         """"""
@@ -56,10 +82,10 @@ class Region:
 
     # Decorators for adding routes and exception handlers
 
-    def route(self, url_rule, methods=None, **kwargs):
+    def route(self, url_rule, methods=None, name=None, **kwargs):
         """"""
         def _decorator(func):
-            self.add_route(url_rule, func, methods, **kwargs)
+            self.add_route(url_rule, func, methods, name, **kwargs)
 
             @functools.wraps(func)
             def _decorated(*args, **kwargs):
@@ -68,10 +94,10 @@ class Region:
 
         return _decorator
 
-    def get(self, url_rule, **kwargs):
+    def get(self, url_rule, name=None, **kwargs):
         """"""
         def _decorator(func):
-            self.add_route(url_rule, func, ['GET'], **kwargs)
+            self.add_route(url_rule, func, ['GET'], name, **kwargs)
 
             @functools.wraps(func)
             def _decorated(*args, **kwargs):
@@ -80,10 +106,10 @@ class Region:
 
         return _decorator
 
-    def post(self, url_rule, **kwargs):
+    def post(self, url_rule, name=None, **kwargs):
         """"""
         def _decorator(func):
-            self.add_route(url_rule, func, ['POST'], **kwargs)
+            self.add_route(url_rule, func, ['POST'], name, **kwargs)
 
             @functools.wraps(func)
             def _decorated(*args, **kwargs):
@@ -92,10 +118,10 @@ class Region:
 
         return _decorator
 
-    def put(self, url_rule, **kwargs):
+    def put(self, url_rule, name=None, **kwargs):
         """"""
         def _decorator(func):
-            self.add_route(url_rule, func, ['PUT'], **kwargs)
+            self.add_route(url_rule, func, ['PUT'], name, **kwargs)
 
             @functools.wraps(func)
             def _decorated(*args, **kwargs):
@@ -104,10 +130,10 @@ class Region:
 
         return _decorator
 
-    def delete(self, url_rule, **kwargs):
+    def delete(self, url_rule, name=None, **kwargs):
         """"""
         def _decorator(func):
-            self.add_route(url_rule, func, ['DELETE'], **kwargs)
+            self.add_route(url_rule, func, name, ['DELETE'], **kwargs)
 
             @functools.wraps(func)
             def _decorated(*args, **kwargs):
