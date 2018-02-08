@@ -14,8 +14,6 @@ from werkzeug.wrappers import BaseRequest, AcceptMixin, ETagRequestMixin, \
     BaseResponse, CommonResponseDescriptorsMixin, \
     ETagResponseMixin
 
-from .util import CombinedDict
-
 
 # Utility constants
 
@@ -65,18 +63,6 @@ class Request(BaseRequest, CommonRequestDescriptorsMixin, ETagRequestMixin,
             return json_data
         except ValueError:
             pass
-
-    # @property
-    # def param(self):
-    #     """
-    #     Combined dictionary containing all request parameters except headers
-    #     """
-    #     if not hasattr(self, '_param'):
-    #         locations = [self.args, self.cookies]
-    #         if self.method in ('POST', 'PUT', 'PATCH'):
-    #             locations = [self.json, self.form, self.files] + locations
-    #         self._param = CombinedDict(locations)
-    #     return self._param
 
 
 class Response(BaseResponse, CommonResponseDescriptorsMixin, ETagResponseMixin):

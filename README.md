@@ -1,0 +1,6 @@
+# Laconic - a Python web framework
+#### *Make Python web apps and APIs with famous laconic brevity*
+
+Laconic is a ...
+
+Laconic is inspired by Flask and Falcon...
