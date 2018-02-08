@@ -32,9 +32,9 @@ class Region:
         routes (list): A list of routes 
     """
 
-    #__slots__ = []
+    __slots__ = ['name', 'routes', 'subregions', 'attrs', ]
 
-    def __init__(self, name: str, routes: Sequence=None, exc_handlers: Sequence=None, **config_params):
+    def __init__(self, name: str, regions: Sequence=None, routes: Sequence=None, exc_handlers: Sequence=None, **config_params):
         """Region object constructor.
 
         Constructs an app region identified by its `name`, optionally registeres provided
@@ -42,6 +42,8 @@ class Region:
         
         Args:
             name (str): The name of the app region
+            regions (optional, Sequence): A sequence of regions to be added to this region as
+                subregions (their )
             routes (optional, Sequence): A sequence of routes to be added to this region
                 (a shorthand definition). Each route is defined as a tuple:
                    `(url_rule, endpoint, [methods: list], [name: str], [params: dict])`
@@ -54,7 +56,11 @@ class Region:
 
         self.routes = {}
         self.subregions = {}
+
         self.attrs = AttributeScope(**config_params)
+
+        if regions is not None:
+            self.add_regions(regions)
 
         if routes is not None:
             self.add_routes(routes)
@@ -65,15 +71,28 @@ class Region:
     # Methods for adding regions, routes and exception handlers
 
     def add_region(self, region: Region, url_prefix: str=None):
-        """"""
+        """Add a subregion to the app region.
+        
+        TODO: Document add_region!
+
+        Args:
+            region (Region):
+            url_prefix (optional, str):
+        """
         self.subregions[(region.name, url_prefix)] = region
 
-    # def add_regions(self, regions):
-    #     """"""
-    #     for ... in regions:
-    #         self.add_region(...)
+    def add_regions(self, regions: Sequence):
+        """Add multiple subregions to the app region.
+        
+        TODO: Document add_regions!
 
-    def add_route(self, url_rule: str, endpoint: Callable, methods: Sequence=None, name:str = None,
+        Args:
+            regions (Sequence): 
+        """
+        for region, *url_prefix in regions:
+            self.add_region(region, url_prefix or None)
+
+    def add_route(self, url_rule: str, endpoint: Callable, methods: Sequence=None, name: str=None,
             **config_params):
         """Add a route to the app region.
         
@@ -81,8 +100,8 @@ class Region:
         will respond to all requests having any of provided `methods` (if not set, default: GET).
         It also allows setting route specific configuration parameters via keyword-only arguments.
 
-        URL rules support parametrized URL sections (e.g. '/users/<int:id>'), and following
-        parameter types are available:
+        URL rules support parametrized URL sections defined as `../<param_name:param_type>/..`
+        (e.g. '/users/<id:int>'), with `param_type` being one of the following:
             - string - any text without a slash (the default type)
             - int - any (unsigned) integer
             - float - any floating-point number
@@ -164,8 +183,20 @@ class Region:
 
     # Decorators for adding routes and exception handlers
 
-    def route(self, url_rule: str, methods=None, name=None, **kwargs):
-        """"""
+    def route(self, url_rule: str, methods: Sequence=None, name: str=None, **config_params):
+        """Shortcut decorator for `add_route` method.
+        
+        For detailed arguments description, see `add_route` documentation.
+
+        Args:
+            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
+                requests
+            methods (optional, Sequence): A sequence of uppercase strings listing all HTTP methods
+                this endpoint will support
+            name (optional, str): A custom name assigned to this route (by default, it is the
+                endpoint function/method name)
+            **config_params: Optional configuration parameters for this endpoint
+        """
         def _decorator(func):
             self.add_route(url_rule, func, methods, name, **kwargs)
 
@@ -176,8 +207,18 @@ class Region:
 
         return _decorator
 
-    def get(self, url_rule, name=None, **kwargs):
-        """"""
+    def get(self, url_rule: str, name: str=None, **config_params):
+        """Shortcut decorator for `add_route(..., methods=['GET'], ...)`.
+        
+        For detailed arguments description, see `add_route` documentation.
+
+        Args:
+            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
+                requests
+            name (optional, str): A custom name assigned to this route (by default, it is the
+                endpoint function/method name)
+            **config_params: Optional configuration parameters for this endpoint
+        """
         def _decorator(func):
             self.add_route(url_rule, func, ['GET'], name, **kwargs)
 
@@ -188,8 +229,17 @@ class Region:
 
         return _decorator
 
-    def post(self, url_rule, name=None, **kwargs):
-        """"""
+    def post(self, url_rule: str, name: str=None, **config_params):
+        """Shortcut decorator for `add_route(..., methods=['POST'], ...)`.
+        
+        For detailed arguments description, see `add_route` documentation.
+
+        Args:
+            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
+                requests
+            name (optional, str): A custom name assigned to this route (by default, it is the
+                endpoint function/method name)
+            **config_params: Optional configuration parameters for this endpoint"""
         def _decorator(func):
             self.add_route(url_rule, func, ['POST'], name, **kwargs)
 
@@ -200,8 +250,17 @@ class Region:
 
         return _decorator
 
-    def put(self, url_rule, name=None, **kwargs):
-        """"""
+    def put(self, url_rule: str, name: str=None, **config_params):
+        """Shortcut decorator for `add_route(..., methods=['PUT'], ...)`.
+        
+        For detailed arguments description, see `add_route` documentation.
+
+        Args:
+            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
+                requests
+            name (optional, str): A custom name assigned to this route (by default, it is the
+                endpoint function/method name)
+            **config_params: Optional configuration parameters for this endpoint"""
         def _decorator(func):
             self.add_route(url_rule, func, ['PUT'], name, **kwargs)
 
@@ -212,8 +271,17 @@ class Region:
 
         return _decorator
 
-    def delete(self, url_rule, name=None, **kwargs):
-        """"""
+    def delete(self, url_rule: str, name: str=None, **config_params):
+        """Shortcut decorator for `add_route(..., methods=['DELETE'], ...)`.
+        
+        For detailed arguments description, see `add_route` documentation.
+
+        Args:
+            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
+                requests
+            name (optional, str): A custom name assigned to this route (by default, it is the
+                endpoint function/method name)
+            **config_params: Optional configuration parameters for this endpoint"""
         def _decorator(func):
             self.add_route(url_rule, func, name, ['DELETE'], **kwargs)
 
@@ -224,16 +292,16 @@ class Region:
 
         return _decorator
 
-    def exception(self, exc_type):
-        """"""
-        def _decorator(func):
-            self.add_exception_handler(exc_type, func)
+    # def exception(self, exc_type):
+    #     """"""
+    #     def _decorator(func):
+    #         self.add_exception_handler(exc_type, func)
 
-            @functools.wraps(func)
-            def _decorated(*args, **kwargs):
-                func(*args, **kwargs)
-            return _decorated
+    #         @functools.wraps(func)
+    #         def _decorated(*args, **kwargs):
+    #             func(*args, **kwargs)
+    #         return _decorated
 
-        return _decorator
+    #     return _decorator
 
 
