@@ -7,11 +7,15 @@ Classes:
     Config - Dict-like object for storing app configuration
     Namespace - Simple namespace for storing arbitrary data.
     AttributeScope - Dict which allows searching for keys in parent scopes
-    ImmutableOrderedList -
-    Dispatchable -
+    ImmutableOrderedList - Immutable ordered list of objects of any kind
+
+    DispatchParam - Description of a single Dispatchable object's parameter
+    Dispatchable - Callable wrapper containing info about all its parameters
+    ExceptionHandler - Exception handler wrapper class
 
 Functions:
-    url_join - Join a sequence of URLs together in a single hierarchical URL
+    join_urls - Join a sequence of URLs together in a single hierarchical URL
+    exc_type_cmp - Compare two exception types
 
 Note:
     Parts of the source code of Config class were borrowed from the Flask project.
