@@ -7,13 +7,22 @@ Copyright:  (c) Zvonimir Jurelinac 2018
 License:    MIT, see LICENSE for more details
 """
 
-class Endpoint:
-    pass
+
+from .util import Dispatchable
+
+
+class Endpoint(Dispatchable):
+    """"""
+
+    # __slots__ = []
+
+    def __init__(self):
+        pass
 
 
 class UrlRule:
     pass
 
 
-class Router:
+class UrlRouter:
     pass
