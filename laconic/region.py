@@ -1,307 +1,157 @@
 """
-App region.
+App regions.
 
-This module defines the app region, a group of related endpoints forming a
-distinct part of the app, identified by a common URL prefix.
+This module defines the abstract concept of an app region as a group of related
+endpoints forming a distinct part of the app. It also provides a specific
+implementation of a URLRegion, which represents a group of endpoints sharing a
+common URL prefix.
 
 Classes:
-    Region - The app region class
+    BaseRegion - Abstract app region class
+    UrlRegion - URL-identified app region
 
+Todos:
+    TODO: route automatic name
+    TODO: pack as many info in attribute scope as possible
+
+    (later)
+    TODO: RPCRegion
 
 Copyright:  (c) Zvonimir Jurelinac 2018
 License:    MIT, see LICENSE for more details
 """
 
-import functools
-
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from .routing import Endpoint
-from .util import AttributeScope, SortedList
+from .util import AttributeScope, Dispatchable, ExceptionHandler
 
+class BaseRegion:
+    """BaseRegion object groups a set of related endpoints in a single whole.
 
-class Region:
-    """The Region object groups a set of related endpoints in a single whole.
-
-    Endpoints belonging to the same group share a common URL prefix (potentially
-    with variable URL sections), and can have shared configuration parameters,
-    error handlers etc.
+    A base class for more specific app region implementations. Provides means
+    for defining region-specific configuration parameters (which will then apply
+    to all contained routes and subregions, unless overriden) and exception
+    handlers.
 
     Attributes:
         name (str): The name of the app region
-        routes (list): A list of routes 
+        subregions (list): List of all subregions added to this region
+        attrs (AttributeScope): Dictionary-like object containing all region's
+            configuration parameters
     """
 
-    __slots__ = ['name', 'routes', 'subregions', 'attrs', ]
+    __slots__ = ['name', 'attrs', 'regions']
 
-    def __init__(self, name: str, regions: Sequence=None, routes: Sequence=None, exc_handlers: Sequence=None, **config_params):
-        """Region object constructor.
+    def __init__(self, name: str, **config_params):
+        """BaseRegion object constructor.
 
-        Constructs an app region identified by its `name`, optionally registeres provided
-        routes and exception handlers, and stores given configuration parameters.
-        
+        Constructs an app region identified by its `name`, and stores all passed
+        configuration parameters. Available configuration parameters common to
+        all types of regions are:
+            exception_handlers (List[Exception, Callable]): List of handlers for
+                particular exception types
+            before_request (List[Callable]): List of hooks to be executed before
+                each request directed to this app region. Hooks will be executed
+                in order they were listed, and
+            after_request (List[Callable]): List of hooks to be executed after
+                each request directed to this app region
+
         Args:
-            name (str): The name of the app region
-            regions (optional, Sequence): A sequence of regions to be added to this region as
-                subregions (their )
-            routes (optional, Sequence): A sequence of routes to be added to this region
-                (a shorthand definition). Each route is defined as a tuple:
-                   `(url_rule, endpoint, [methods: list], [name: str], [params: dict])`
-            exc_handlers (optional, Sequence): A sequence of exception handlers for this
-                region. Each handler is defined as a tuple: `(exc_type, handler)`
-            **config_params: Optional configuration parameters shared between all routes
-                belonging to this region
+            name (str):
+            **config_params:
         """
         self.name = name
-
-        self.routes = {}
-        self.subregions = {}
-
+        self.regions = {}
         self.attrs = AttributeScope(**config_params)
 
-        if regions is not None:
-            self.add_regions(regions)
+        if 'exception_handlers' not in self.attrs:
+            self.attrs['exception_handlers'] = []
 
-        if routes is not None:
-            self.add_routes(routes)
+        if 'before_request' not in self.attrs:
+            self.attrs['before_request'] = []
 
-        # if exception_handlers is not None:
-        #     self.add_exception_handlers(handlers)
+        if 'after_request' not in self.attrs:
+            self.attrs['after_request'] = []
 
-    # Methods for adding regions, routes and exception handlers
-
-    def add_region(self, region: Region, url_prefix: str=None):
+    def add_region(self, region, url_prefix: str=None):
         """Add a subregion to the app region.
-        
-        TODO: Document add_region!
+
+        Adds an existing region as a subregion to this one. The subregion will
+        inherit all configuration parameters of this region (but it can override
+        them if desired).
 
         Args:
-            region (Region):
-            url_prefix (optional, str):
+            region (Region): Existing app region to be added as a subretion
+                to this one
         """
-        self.subregions[(region.name, url_prefix)] = region
+        region.attrs.parent = self.attrs
+        self.regions[region.name] = region
 
     def add_regions(self, regions: Sequence):
         """Add multiple subregions to the app region.
-        
-        TODO: Document add_regions!
+
+        For more details, see documentation of `add_region` method.
 
         Args:
-            regions (Sequence): 
+            regions (Sequence): A sequence (list, tuple) of regions to be added
+                to this region as subregions
         """
-        for region, *url_prefix in regions:
-            self.add_region(region, url_prefix or None)
+        for region in regions:
+            self.add_region(region)
 
-    def add_route(self, url_rule: str, endpoint: Callable, methods: Sequence=None, name: str=None,
-            **config_params):
-        """Add a route to the app region.
-        
-        Registers a route to the region at a specified URL (potentially parametrized), which
-        will respond to all requests having any of provided `methods` (if not set, default: GET).
-        It also allows setting route specific configuration parameters via keyword-only arguments.
+    def add_exception_handler(self, exc_type: type, exc_handler: Callable,
+                              **config_options):
+        """Add an exception handler to the region.
 
-        URL rules support parametrized URL sections defined as `../<param_name:param_type>/..`
-        (e.g. '/users/<id:int>'), with `param_type` being one of the following:
-            - string - any text without a slash (the default type)
-            - int - any (unsigned) integer
-            - float - any floating-point number
-            - path - any text, can include slashes
-
-        The callable's parameters should be tagged with Python type hints to enable parameter type
-        deduction and validation (otherwise, all parameters will be considered to be strings).
-        Alternatively, a special decorator can be used to manually set parameter types and
-        constraints (TODO: Route param decorator)
+        Register an exception handler for handling exceptions of specified type
+        that occur during processing of requests for this app region. Registered
+        handler will handle all exceptions of this type and its subtypes, unless
+        there is another handler defined for a more specific derived type.
 
         Args:
-            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
-                requests
-            endpoint (Callable): Any Python callable (a function, method, custom callable object...)
-                which will be called to process requests for a given route.
-            methods (optional, Sequence): A sequence of uppercase strings listing all HTTP methods
-                this endpoint will support (possible element values: GET, POST, PUT, DELETE, PATCH,
-                HEAD, OPTIONS)
-            name (optional, str): A custom name assigned to this route (by default, it is the
-                endpoint function/method name)
-            **config_params: Optional configuration parameters for this endpoint
-
-        Raises:
-            xyz - Invalid route definition?
+            exc_type (type): Type of exceptions this handler should handle
+            exc_handler (Callable): Any Python callable, it will be called to
+                handle the exception and optionally provide a response to the
+                requester
+            **config_options: Optional configuration parameters for the handler
         """
-        self.routes.append((url_rule, methods, Endpoint(endpoint, name=name, **config_params)))
+        self.attrs['exception_handlers'].append(
+            ExceptionHandler(exc_type, exc_handler,
+                             AttributeScope(self.attrs, **config_options))
+        )
 
-    def add_routes(self, routes: Sequence):
-        """Add multiple routes to the app region.
-        
-        Description of each route should contain at least the URL rule and the endpoint for the
-        route, and optionally also the list of supported methods (by default only GET is supported),
-        route name (by default the endpoint function/method name), and a dictionary containing route
-        configuration parameters. For more info on expected URL rule format, as well as other
-        parameters, see documentation for `add_route` method.
+    def add_exception_handlers(self, exc_handlers: Sequence):
+        """Add multiple exception handlers to the region.
 
         Args:
-            routes (Sequence): A sequence (list, tuple) of routes to be added to the region.
-                Each route should be defined as a tuple:
-                    `(url_rule, endpoint, [methods: list | tuple], [name: str], [params: dict])`
-
-        Raises:
-            xyz - Invalid route definition?
+            exc_handlers (Sequence): Sequence (list, tuple) of handlers to be
+                registered for the region. Each handler is defined by a tuple:
+                `(exc_type: type, exc_handler: Callable, [config_options: dict])`
+                For a detailed description of each, see `add_exception_handler`
+                method documentation.
         """
-        for route_def in routes:
-            if not isinstance(route_def, tuple):
-                raise TypeError('Route definition should be a tuple: %s.' % route_def)
-            
-            if len(route_def) < 2:
-                raise ValueError('Incorrect route definition (should contain at least'
-                                 'the URL and endpoint): %s' % route_def)
+        for exc_type, exc_handler, *config_options in exc_handlers:
+            self.add_exception_handler(exc_type, exc_handler,
+                                       **(config_options or {}))
 
-            url_rule = route_def[0]
-            endpoint = route_def[1]
-            
-            methods, name, attrs = None, None, None
-            
-            for item in route_def[2:]
-                if isinstance(item, str) and name is None:
-                    name = item
-                elif isinstance(item, list, tuple) and methods is None:
-                    methods = item
-                elif isinstance(item, dict) and attrs is None:
-                    attrs = item
-                else:
-                    raise TypeError('Incorrect route definition (cannot recognize part: %s): %s'
-                                    % (item, route_def))
+    # Shortcut decorators - for defining exception handlers
 
-            # TODO: Except potential errors and notify which route caused it
-            self.add_route(url_rule, endpoint, methods=methods, name=name, **(attrs or {}))
+    def exception(self, exc_type: type, **config_options):
+        """Shortcut decorator for `add_exception_handler`.
 
-    # def add_exception_handler(self, exc_type, exc_handler):
-    #     """"""
-
-    # def add_exception_handlers(self, exc_handlers):
-    #     """"""
-    #     for exc_type, exc_handler in exc_handlers:
-    #         self.add_exception_handler(exc_type, exc_handler)
-
-    # Decorators for adding routes and exception handlers
-
-    def route(self, url_rule: str, methods: Sequence=None, name: str=None, **config_params):
-        """Shortcut decorator for `add_route` method.
-        
-        For detailed arguments description, see `add_route` documentation.
+        For detailed arguments description, see `add_exception_handler`
+        documentation.
 
         Args:
-            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
-                requests
-            methods (optional, Sequence): A sequence of uppercase strings listing all HTTP methods
-                this endpoint will support
-            name (optional, str): A custom name assigned to this route (by default, it is the
-                endpoint function/method name)
-            **config_params: Optional configuration parameters for this endpoint
+            exc_type (type): Type of exceptions this handler should handle
+            **config_options: Optional configuration parameters for the handler
         """
         def _decorator(func):
-            self.add_route(url_rule, func, methods, name, **kwargs)
-
-            @functools.wraps(func)
-            def _decorated(*args, **kwargs):
-                func(*args, **kwargs)
-            return _decorated
-
+            self.add_exception_handler(exc_type, func)
+            return func
         return _decorator
 
-    def get(self, url_rule: str, name: str=None, **config_params):
-        """Shortcut decorator for `add_route(..., methods=['GET'], ...)`.
-        
-        For detailed arguments description, see `add_route` documentation.
 
-        Args:
-            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
-                requests
-            name (optional, str): A custom name assigned to this route (by default, it is the
-                endpoint function/method name)
-            **config_params: Optional configuration parameters for this endpoint
-        """
-        def _decorator(func):
-            self.add_route(url_rule, func, ['GET'], name, **kwargs)
-
-            @functools.wraps(func)
-            def _decorated(*args, **kwargs):
-                func(*args, **kwargs)
-            return _decorated
-
-        return _decorator
-
-    def post(self, url_rule: str, name: str=None, **config_params):
-        """Shortcut decorator for `add_route(..., methods=['POST'], ...)`.
-        
-        For detailed arguments description, see `add_route` documentation.
-
-        Args:
-            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
-                requests
-            name (optional, str): A custom name assigned to this route (by default, it is the
-                endpoint function/method name)
-            **config_params: Optional configuration parameters for this endpoint"""
-        def _decorator(func):
-            self.add_route(url_rule, func, ['POST'], name, **kwargs)
-
-            @functools.wraps(func)
-            def _decorated(*args, **kwargs):
-                func(*args, **kwargs)
-            return _decorated
-
-        return _decorator
-
-    def put(self, url_rule: str, name: str=None, **config_params):
-        """Shortcut decorator for `add_route(..., methods=['PUT'], ...)`.
-        
-        For detailed arguments description, see `add_route` documentation.
-
-        Args:
-            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
-                requests
-            name (optional, str): A custom name assigned to this route (by default, it is the
-                endpoint function/method name)
-            **config_params: Optional configuration parameters for this endpoint"""
-        def _decorator(func):
-            self.add_route(url_rule, func, ['PUT'], name, **kwargs)
-
-            @functools.wraps(func)
-            def _decorated(*args, **kwargs):
-                func(*args, **kwargs)
-            return _decorated
-
-        return _decorator
-
-    def delete(self, url_rule: str, name: str=None, **config_params):
-        """Shortcut decorator for `add_route(..., methods=['DELETE'], ...)`.
-        
-        For detailed arguments description, see `add_route` documentation.
-
-        Args:
-            url_rule (str): An URL rule defining the URL paths for which this endpoint will receive
-                requests
-            name (optional, str): A custom name assigned to this route (by default, it is the
-                endpoint function/method name)
-            **config_params: Optional configuration parameters for this endpoint"""
-        def _decorator(func):
-            self.add_route(url_rule, func, name, ['DELETE'], **kwargs)
-
-            @functools.wraps(func)
-            def _decorated(*args, **kwargs):
-                func(*args, **kwargs)
-            return _decorated
-
-        return _decorator
-
-    # def exception(self, exc_type):
-    #     """"""
-    #     def _decorator(func):
-    #         self.add_exception_handler(exc_type, func)
-
-    #         @functools.wraps(func)
-    #         def _decorated(*args, **kwargs):
-    #             func(*args, **kwargs)
-    #         return _decorated
-
-    #     return _decorator
-
-
+class UrlRegion(BaseRegion):
+    """"""
