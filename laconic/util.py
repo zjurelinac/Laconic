@@ -105,7 +105,7 @@ class Namespace:
         return self.__dict__ == other.__dict__
 
 
-class AttributeScope(MutableMapping):
+class AttributeScope(metaclass=MutableMapping):
     """Nested attribute scope which allows searching for keys in parent scopes.
 
     Provides a dict-like interface, with the difference that a key missing in
@@ -170,7 +170,7 @@ class AttributeScope(MutableMapping):
         return rd
 
 
-class ImmutableOrderedList(Sequence):
+class ImmutableOrderedList(metaclass=Sequence):
     """Immutable ordered list of objects of any kind."""
 
     __slots__ = ['_items']
@@ -244,15 +244,16 @@ class DispatchParam:
                                          self.type_, self.default)
 
 
-class Dispatchable(Callable):
+class Dispatchable(metaclass=Callable):
     """Callable wrapper containing info about all its parameters.
 
     A Dispatchable object is a wrapper around any Python callable containing
     info about all its parameters - their names, types, default values etc.
 
-    Attributes:
+    Attributes (TODO: describe):
         parameters (List[DispatchParam])
         return_type (type)
+        _callable (Callable)
     """
 
     __slots__ = ['_callable', 'parameters', 'return_type']
@@ -274,12 +275,62 @@ class Dispatchable(Callable):
     def __call__(self, *args, **kwargs):
         return self._callable(args, kwargs)
 
+    def __repr__(self):
+        return '<%s %s -> %s>' % (self.__class__.__name__, self.parameters,
+                                  self.return_type)
+
 
 class ExceptionHandler(Dispatchable):
-    """"""
+    """Exception handler wrapper class.
 
-    def __init__(self, exc_type, exc_handler, attrs):
-        pass
+    An ExceptionHandler is a wrapper around any Python callable chosen to handle
+    exceptions of a certain type. It contains info about all the handler's
+    parameters - their names, types, default values etc., as well as type of
+    exceptions it should handle and additional arbitrary configuration
+    parameters that can be used to further specify details of exception handling.
+
+    Attributes (TODO: describe):
+        exc_type (type)
+        attrs (AttributeScope)
+        parameters (List[DispatchParam])
+        return_type (type)
+        _callable (Callable)
+    """
+
+    __slots__ = ['exc_type', 'attrs']
+
+    def __init__(self, exc_type: type, exc_handler: Callable,
+                 config_params: AttributeScope):
+        super().__init__(exc_handler)
+
+        self.exc_type = exc_type
+        self.attrs = config_params
+
+    def __eq__(self, other):
+        return self._cmp(other) == 0
+
+    def __ne__(self, other):
+        return self._cmp(other) != 0
+
+    def __lt__(self, other):
+        return self._cmp(other) < 0
+
+    def __gt__(self, other):
+        return self._cmp(other) > 0
+
+    def __le__(self, other):
+        return self._cmp(other) <= 0
+
+    def __ge__(self, other):
+        return self._cmp(other) >= 0
+
+    def __repr__(self):
+        return '<%s for %s (%s -> %s)>' % (self.__class__.__name__, self.exc_type,
+                                          self.parameters, self.return_type)
+
+    def _cmp(self, other) -> int:
+        tcmp = _util_cmp(self.exc_type, other.exc_type)
+        return tcmp if tcmp != 0 else _util_cmp(self._callable, other._callable)
 
 
 # class SortedPriorityList:
@@ -346,12 +397,13 @@ def exc_type_cmp(exc_type1, exc_type2):
     elif issubclass(exc_type2, exc_type1):
         return 1
 
-    def cmp(x, y):
-        """Inner utility compare function, standard format"""
-        return 0 if x == y else (-1 if x < y else 1)
-
     # Comparison of exception types' depths in class hierarchy
     #   (= number of superclasses of each)
-    dcmp = cmp(len(exc_type1.__mro__), len(exc_type2.__mro__))
+    dcmp = _util_cmp(len(exc_type1.__mro__), len(exc_type2.__mro__))
 
-    return dcmp if dcmp != 0 else cmp(exc_type1.__name__, exc_type2.__name__)
+    return dcmp if dcmp != 0 else _util_cmp(exc_type1.__name__, exc_type2.__name__)
+
+
+def _util_cmp(x, y):
+    """Utility compare function, standard format"""
+    return 0 if x == y else (-1 if x < y else 1)
