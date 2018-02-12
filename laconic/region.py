@@ -36,11 +36,11 @@ class BaseRegion:
         name (str): The name of the app region
         endpoints (list): List of all endpoints belonging to this region
         regions (list): List of all subregions added to this region
-        region_attrs (AttributeScope): Dictionary-like object containing
+        attrs (AttributeScope): Dictionary-like object containing
             region-specific configuration parameters
     """
 
-    __slots__ = ['name', 'endpoints', 'regions', 'region_attrs']
+    __slots__ = ['name', 'endpoints', 'regions', 'attrs']
 
     def __init__(self, name: str, endpoints: Sequence=None,
                  regions: Sequence=None, **region_attrs):
@@ -71,7 +71,7 @@ class BaseRegion:
         self.name = name
         self.endpoints = []
         self.regions = []
-        self.region_attrs = AttributeScope(**region_attrs)
+        self.attrs = AttributeScope(**region_attrs)
 
         if endpoints is not None:
             self.add_endpoints(endpoints)
@@ -79,14 +79,14 @@ class BaseRegion:
         if regions is not None:
             self.add_regions(regions)
 
-        if 'exception_handlers' not in self.region_attrs:
-            self.region_attrs['exception_handlers'] = []
+        if 'exception_handlers' not in self.attrs:
+            self.attrs['exception_handlers'] = []
 
-        if 'before_request' not in self.region_attrs:
-            self.region_attrs['before_request'] = []
+        if 'before_request' not in self.attrs:
+            self.attrs['before_request'] = []
 
-        if 'after_request' not in self.region_attrs:
-            self.region_attrs['after_request'] = []
+        if 'after_request' not in self.attrs:
+            self.attrs['after_request'] = []
 
     def add_endpoint(self, endpoint: Callable, **endpoint_attrs):
         """Add an endpoint to the app region.
@@ -104,9 +104,7 @@ class BaseRegion:
                 requests for a given route.
             **endpoint_attrs: Optional configuration parameters for this endpoint
         """
-        self.endpoints.append(
-            (endpoint, AttributeScope(self.region_attrs, **endpoint_attrs))
-        )
+        self.endpoints.append((endpoint, AttributeScope(self.attrs, **endpoint_attrs)))
 
     def add_endpoints(self, endpoints: Sequence):
         """Add multiple endpoints to the app region.
@@ -134,7 +132,7 @@ class BaseRegion:
         Args:
             region (Region): Existing app region to be added as a subregion
         """
-        region.region_attrs.parent = self.region_attrs
+        region.attrs.parent = self.attrs
         self.regions.append(region)
 
     def add_regions(self, regions: Sequence):
@@ -165,9 +163,9 @@ class BaseRegion:
                 requester
             **handler_attrs: Optional configuration parameters for the handler
         """
-        self.region_attrs['exception_handlers'].append(
+        self.attrs['exception_handlers'].append(
             ExceptionHandler(exc_type, exc_handler,
-                             AttributeScope(self.region_attrs, **handler_attrs))
+                             AttributeScope(self.attrs, **handler_attrs))
         )
 
     def add_exception_handlers(self, exc_handlers: Sequence):
@@ -251,7 +249,7 @@ class UrlRegion(BaseRegion):
         Args:
             region (Region): Existing app region to be added as a subregion
         """
-        region.region_attrs.parent = self.region_attrs
+        region.attrs.parent = self.attrs
         self.regions.append((region, url_prefix))
 
     def add_regions(self, regions: Sequence):
@@ -296,7 +294,7 @@ class UrlRegion(BaseRegion):
             **endpoint_attrs: Optional configuration parameters for this endpoint
         """
         self.endpoints.append(
-            (url_rule, endpoint, AttributeScope(self.region_attrs, **endpoint_attrs))
+            (url_rule, endpoint, AttributeScope(self.attrs, **endpoint_attrs))
         )
 
     def add_endpoints(self, endpoints: Sequence):
