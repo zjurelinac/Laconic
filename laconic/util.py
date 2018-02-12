@@ -29,9 +29,10 @@ License:    MIT, see LICENSE for more details
 import functools
 import operator
 import os
+import re
 import types
 
-from collections.abc import Callable, MutableMapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from inspect import signature, Signature
 
 
@@ -41,7 +42,7 @@ _MISSING = object()
 
 # Generic datastructures
 
-class Config(dict):
+class Config(Mapping):
     """Simple dictionary storing app configuration.
 
     This class differs from builtin Python dict in that when a key is not
@@ -52,12 +53,20 @@ class Config(dict):
     parameters, and ignore all others.
     """
 
-    def __init__(self, base_path:str = None, defaults=None):
-        super().__init__(defaults or {})
+    __slots__ = ['_data', '_base_path']
+
+    def __init__(self, base_path: str=None, defaults=None):
+        self._data = defaults or {}
         self._base_path = base_path
 
-    def __missing__(self, key):
-        return None
+    def __getitem__(self, key):
+        return self._data.get(key, None)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
 
     def from_pyfile(self, filename: str) -> None:
         """Load configuration parameters from a Python file.
@@ -109,11 +118,12 @@ class Namespace:
         return self.__dict__ == other.__dict__
 
 
-class AttributeScope(metaclass=MutableMapping):
+class AttributeScope(metaclass=Mapping):
     """Nested attribute scope which allows searching for keys in parent scopes.
 
     Provides a dict-like interface, with the difference that a key missing in
     this scope can be retrieved from any of the parent scopes (if it's there).
+    It is also immutable.
 
     Methods (additional):
         all - Return all values this key maps to from the whole scope hierarchy
@@ -132,12 +142,6 @@ class AttributeScope(metaclass=MutableMapping):
             return self._parent[key]
         else:
             raise KeyError(key)
-
-    def __setitem__(self, key, value):
-        self._data[key] = value
-
-    def __delitem__(self, key):
-        del self._data[key]
 
     def __len__(self):
         return len(self._combine())
@@ -415,5 +419,5 @@ def _util_cmp(x, y):
 
 def camel_case_split(identifier):
     """Split a camelcase-capitalized string"""
-    matches = finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
+    matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
     return [m.group(0) for m in matches]
