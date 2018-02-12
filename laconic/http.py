@@ -14,11 +14,7 @@ from werkzeug.wrappers import BaseRequest, AcceptMixin, ETagRequestMixin, \
     BaseResponse, CommonResponseDescriptorsMixin, \
     ETagResponseMixin
 
-
-# Utility constants
-
-_missing = object()  # A sentinel value representing missing cache
-
+from .util import _MISSING
 
 # HTTP data structures
 
@@ -48,8 +44,8 @@ class Request(BaseRequest, CommonRequestDescriptorsMixin, ETagRequestMixin,
         If the request doesn't contain JSON data, it will return `None`.
         """
 
-        json_data = getattr(self, '_cached_json', _missing)
-        if json_data is not _missing:
+        json_data = getattr(self, '_cached_json', _MISSING)
+        if json_data is not _MISSING:
             return json_data
 
         request_charset = self.mimetype_params.get('charset')

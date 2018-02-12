@@ -13,17 +13,11 @@ from .region import Region
 from .routing import Router
 
 
-class Laconic(Region):
+class Laconic(UrlRegion):
     """
     """
 
-    #__slots__ = ['request_class', 'response_class', 'context_class', 'router_class'] + Region.__slots__
-
-    # Class in use for request objects
-    request_class = Request
-
-    # Class in use for response objects
-    response_class = Response
+    #__slots__ = ['context_class', 'router_class']
 
     # Class in use for request-processing context
     context_class = Context
@@ -49,3 +43,6 @@ class Laconic(Region):
 
     # WSGI
 
+
+class LaconicRPC():
+    pass

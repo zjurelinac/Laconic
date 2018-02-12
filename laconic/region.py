@@ -9,12 +9,9 @@ common URL prefix.
 Classes:
     BaseRegion - Abstract app region class
     UrlRegion - URL-identified app region
+    RpcRegion - ...
 
 Todos:
-    TODO: route automatic name
-    TODO: pack as many info in attribute scope as possible
-
-    (later)
     TODO: RPCRegion
 
 Copyright:  (c) Zvonimir Jurelinac 2018
@@ -386,3 +383,7 @@ class UrlRegion(BaseRegion):
             self.add_route(url_rule, func, methods=['DELETE'], **config_params)
             return func
         return _decorator
+
+
+class RpcRegion(BaseRegion):
+    """"""
