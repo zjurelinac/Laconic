@@ -182,8 +182,11 @@ class ImmutableDict(metaclass=Mapping):
     """Immutable variant of builtin dictionary"""
     __slots__ = ['_data']
 
-    def __init__(self, **values):
-        self._data = values
+    def __init__(self, *args, **kwargs):
+        if len(args) > 1:
+            raise TypeError('%s expected at most 1 arguments, got %d'
+                            % (self.__class__.__name__, len(args)))
+        self._data = dict(args, **kwargs)
 
     def __getitem__(self, key):
         return self._data[key]
