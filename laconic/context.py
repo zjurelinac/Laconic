@@ -11,11 +11,16 @@ License:    MIT, see LICENSE for more details
 class BaseContext:
     """"""
 
+    # __slots__ = ['']
+
     # Class in use for request objects
     request_class = None
 
     # Class in use for response objects
     response_class = None
+
+    def __init__(self, app, environ):
+        pass
 
 
 # class Context(BaseContext):
