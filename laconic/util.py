@@ -42,7 +42,7 @@ _MISSING = object()
 
 # Generic datastructures
 
-class Config(Mapping):
+class Config(metaclass=Mapping):
     """Simple dictionary storing app configuration.
 
     This class differs from builtin Python dict in that when a key is not
@@ -176,6 +176,26 @@ class AttributeScope(metaclass=Mapping):
             rd.update(d)
 
         return rd
+
+
+class ImmutableDict(metaclass=Mapping):
+    """Immutable variant of builtin dictionary"""
+    __slots__ = ['_data']
+
+    def __init__(self, **values):
+        self._data = values
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
+
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, self._data)
 
 
 class ImmutableOrderedList(metaclass=Sequence):
