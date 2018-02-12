@@ -411,3 +411,9 @@ def exc_type_cmp(exc_type1, exc_type2):
 def _util_cmp(x, y):
     """Utility compare function, standard format"""
     return 0 if x == y else (-1 if x < y else 1)
+
+
+def camel_case_split(identifier):
+    """Split a camelcase-capitalized string"""
+    matches = finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
+    return [m.group(0) for m in matches]
