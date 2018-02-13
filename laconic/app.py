@@ -1,19 +1,25 @@
-"""
-Laconic app, a WSGI application and central object of each app or API
+"""Laconic app, a WSGI application and central object of each app or API
 
 ...
+
+Classes:
+    EventPriority
+    LaconicBase
+    Laconic
+    LaconicRpc
 
 Copyright:  (c) Zvonimir Jurelinac 2018
 License:    MIT, see LICENSE for more details
 """
 
 import enum
+import os
 
 from .context import BaseContext
 from .http import Request, Response
 from .region import BaseRegion
-from .routing import UrlRouter
-from .util import Namespace, ImmutableDict
+from .routing import BaseRouter
+from .util import Config, Namespace, ImmutableDict
 
 
 class EventPriority(enum.Enum):
@@ -31,13 +37,14 @@ class EventPriority(enum.Enum):
 class LaconicBase(BaseRegion):
     """"""
 
-    #__slots__ = ['context_class', 'router_class']
+    __slots__ = ['context_class', 'router_class', 'base_path', 'router',
+                 'config', 'logger', 'extensions', 'resources', 'event_handlers']
 
     # Class in use for request-processing context
-    context_class = None
+    context_class = BaseContext
 
     # Class in use for routing
-    router_class = None
+    router_class = BaseRouter
 
     default_config = ImmutableDict({
         'DEBUG': False,
@@ -50,18 +57,22 @@ class LaconicBase(BaseRegion):
         """"""
         super().__init__(name, endpoints, regions, **app_attrs)
 
+
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+        self.config = Config.create(config, self.default_config,
+                                    base_path=self.base_path)
+
+        self.router = self.router_class()
+        self.logger = logger or self._create_default_logger()
+
+        self.event_handlers = {}
+
         self.resources = Namespace()
 
-    # def add_event_hook(self, event_name, event_hook, hook_priority=None):
-    #     """"""
-
-
-    # def add_event_hooks(self, event_hooks):
-    #     """"""
-#         for event_name, event_hook, *event_priority in event_hooks:
-#             self.add_event_hook(event_name, event_hook, event_priority or None)
-
-#     # Decorators for adding event hooks
+    # Util
+    
+    def _create_default_logger(self):
+        pass
 
 
 # class Laconic(LaconicBase):

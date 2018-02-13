@@ -24,5 +24,9 @@ class UrlRule:
     pass
 
 
+
+class BaseRouter:
+    pass
+
 class UrlRouter:
     pass
