@@ -51,16 +51,20 @@ class Config(Mapping):
     loading configuration parameters from different sources - from Python files
     or objects. When doing so, it will treat only the uppercase keys as config
     parameters, and ignore all others.
+
+    Attributes:
+        _base_path (str): Starting point in the filesystem from where Python
+            files will be looked for (in `from_pyfile` method)
     """
 
     __slots__ = ['_data', '_base_path']
 
-    def __init__(self, base_path: str=None, defaults=None):
+    def __init__(self, base_path: str=None, **defaults):
         self._data = defaults or {}
         self._base_path = base_path
 
     def __getitem__(self, key):
-        return self._data.get(key, None)
+        return self._data[key]
 
     def __iter__(self):
         return iter(self._data)
@@ -69,7 +73,7 @@ class Config(Mapping):
         return len(self._data)
 
     def from_pyfile(self, filename: str) -> None:
-        """Load configuration parameters from a Python file.
+        """Load configuration from a Python file.
 
         Args:
             filename (str): A path (relative to `self.base_path`) to the Python
@@ -90,7 +94,7 @@ class Config(Mapping):
         self.from_object(d)
 
     def from_object(self, obj: object) -> None:
-        """Load configuration parameters from an object.
+        """Load configuration from an object.
 
         Args:
             obj (object): Any object containing uppercase-named attributes which
@@ -100,8 +104,44 @@ class Config(Mapping):
             if key.isupper():
                 self._data[key] = getattr(obj, key)
 
+    def from_dict(self, obj: dict) -> None:
+        """Load configuration from a Python dict
+        
+        Args:
+            obj (dict): A dict whose uppercase-named keys should be set as
+                configuration parameters
+        """
+        for key in obj:
+            if key.isupper():
+                self._data[key] = obj[key]
+
+    @classmethod
+    def create(cls, obj, defaults=None, base_path=None):
+        """Create a Config object from passed arguments.
+        
+        Args:
+            obj (any): Either a string containing filename of the Python file,
+                a dictionary, or an object, from which the config parameters
+                should be read
+            defaults (optional, dict): Default config values which can be
+                overriden with those from `obj`
+            base_path (optional, str): Base filesystem path, location of a
+                starting point from which Python files will be looked for
+                (in `from_pyfile` method)
+        """
+        cfg = cls(base_path=base_path, **(defaults or {}))
+
+        if isinstance(obj, str):
+            cfg.from_pyfile(obj)
+        elif isinstance(obj, dict):
+            cfg.from_dict(obj)
+        else:
+            cfg.from_object(obj)
+
+        return cfg
+
     def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, super().__repr__())
+        return '<%s %s>' % (self.__class__.__name__, self._data)
 
 
 class Namespace:
