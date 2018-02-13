@@ -42,7 +42,7 @@ _MISSING = object()
 
 # Generic datastructures
 
-class Config(metaclass=Mapping):
+class Config(Mapping):
     """Simple dictionary storing app configuration.
 
     This class differs from builtin Python dict in that when a key is not
@@ -98,7 +98,7 @@ class Config(metaclass=Mapping):
         """
         for key in dir(obj):
             if key.isupper():
-                self[key] = getattr(obj, key)
+                self._data[key] = getattr(obj, key)
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, super().__repr__())
@@ -118,7 +118,7 @@ class Namespace:
         return self.__dict__ == other.__dict__
 
 
-class AttributeScope(metaclass=Mapping):
+class AttributeScope(Mapping):
     """Nested attribute scope which allows searching for keys in parent scopes.
 
     Provides a dict-like interface, with the difference that a key missing in
@@ -178,7 +178,7 @@ class AttributeScope(metaclass=Mapping):
         return rd
 
 
-class ImmutableDict(metaclass=Mapping):
+class ImmutableDict(Mapping):
     """Immutable variant of builtin dictionary"""
     __slots__ = ['_data']
 
@@ -201,7 +201,7 @@ class ImmutableDict(metaclass=Mapping):
         return '<%s %s>' % (self.__class__.__name__, self._data)
 
 
-class ImmutableOrderedList(metaclass=Sequence):
+class ImmutableOrderedList(Sequence):
     """Immutable ordered list of objects of any kind."""
 
     __slots__ = ['_items']
@@ -275,7 +275,7 @@ class DispatchParam:
                                          self.type_, self.default)
 
 
-class Dispatchable(metaclass=Callable):
+class Dispatchable(Callable):
     """Callable wrapper containing info about all its parameters.
 
     A Dispatchable object is a wrapper around any Python callable containing
