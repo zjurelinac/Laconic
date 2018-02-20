@@ -3,7 +3,7 @@
 ...
 
 Classes:
-    EventPriority
+    EventPrio
     LaconicBase
     Laconic
     LaconicRpc
@@ -15,14 +15,15 @@ License:    MIT, see LICENSE for more details
 import enum
 import os
 
+from collections.abc import Callable, Mapping, Sequence
+
 from .context import BaseContext
-from .http import Request, Response
 from .region import BaseRegion
 from .routing import BaseRouter
 from .util import Config, Namespace, ImmutableDict
 
 
-class EventPriority(enum.Enum):
+class EventPrio(enum.Enum):
     CRITICAL = 9
     VERY_HIGH = 8
     HIGH = 7
@@ -52,8 +53,9 @@ class LaconicBase(BaseRegion):
         'HTTP_OPTIONS_RESPONSE_BODY': False
     })
 
-    def __init__(self, name, config=None, extensions=None, logger=None,
-                 endpoints=None, regions=None, **app_attrs):
+    def __init__(self, name: str, config: Mapping=None,
+                 extensions: Sequence=None, logger=None,
+                 endpoints: Sequence=None, regions: Sequence=None, **app_attrs):
         """"""
         super().__init__(name, endpoints, regions, **app_attrs)
 
@@ -68,6 +70,14 @@ class LaconicBase(BaseRegion):
         self.event_handlers = {}
 
         self.resources = Namespace()
+
+    # Region and endpoint actions
+
+    def add_endpoint(self, endpoint: Callable, **endpoint_attrs):
+        pass
+
+    def add_region(self, region, **region_attrs):
+        pass
 
     # Util
     
