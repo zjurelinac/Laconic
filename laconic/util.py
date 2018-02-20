@@ -13,9 +13,13 @@ Classes:
     Dispatchable - Callable wrapper containing info about all its parameters
     ExceptionHandler - Exception handler wrapper class
 
+Decorators:
+    dispatchable - For manual definition of callable's params and return type
+
 Functions:
-    join_urls - Join a sequence of URLs together in a single hierarchical URL
-    exc_type_cmp - Compare two exception types
+    join_urls(*urls) - Join a sequence of URLs together in a single URL
+    exc_type_cmp(et1, et2) - Compare two exception types
+    camel_case_split - Split a camelcase-capitalized string
 
 Note:
     Parts of the source code of Config class were borrowed from the Flask project.
@@ -32,7 +36,7 @@ import os
 import re
 import types
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from inspect import signature, Signature
 
 
@@ -42,7 +46,7 @@ _MISSING = object()
 
 # Generic datastructures
 
-class Config(Mapping):
+class Config(MutableMapping):
     """Simple dictionary storing app configuration.
 
     This class differs from builtin Python dict in that when a key is not
@@ -65,6 +69,15 @@ class Config(Mapping):
 
     def __getitem__(self, key):
         return self._data[key]
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __delitem__(self, key):
+        del self._data[key]
+
+    def __contains__(self, key):
+        return key in self._data
 
     def __iter__(self):
         return iter(self._data)
@@ -166,7 +179,8 @@ class AttributeScope(Mapping):
     It is also immutable.
 
     Methods (additional):
-        all - Return all values this key maps to from the whole scope hierarchy
+        all(self, key) - Return all values this key maps to from the whole
+            scope hierarchy
     """
 
     __slots__ = ['_data', '_parent']
@@ -319,36 +333,43 @@ class Dispatchable(Callable):
     """Callable wrapper containing info about all its parameters.
 
     A Dispatchable object is a wrapper around any Python callable containing
-    info about all its parameters - their names, types, default values etc.
+    info about its parameters - their names, types, default values..., and
+    return type.
 
-    Attributes (TODO: describe):
-        parameters (List[DispatchParam])
-        return_type (type)
-        _callable (Callable)
+    Attributes:
+        callable (Callable) - Actual callable being wrapped
+        parameters (List[DispatchParam]) - Descriptions of callable's parameters
+        return_type (type) - Return type of the callable
     """
 
-    __slots__ = ['_callable', 'parameters', 'return_type']
+    __slots__ = ['callable', 'parameters', 'return_type']
 
-    def __init__(self, callable: Callable):
+    def __init__(self, callable: Callable, parameters: list, return_type: type):
+        self.callable = callable
+        self.parameters = parameters
+        self.return_type = return_type
+
+    @classmethod
+    def from_signature(cls, callable: Callable):
         if not isinstance(callable, Callable):
             raise TypeError('Object is not a callable: %s' % callable)
 
-        self._callable = callable
-
         call_sign = signature(callable)
-        self.parameters = {
+        parameters = {
             k: DispatchParam.from_signature(v, type_required=True)
                 for k, v in call_sign.parameters.items()
         }
 
-        self.return_type = call_sign.return_annotation
+        return_type = call_sign.return_annotation
+
+        return cls(callable, parameters, return_type)
 
     def __call__(self, *args, **kwargs):
-        return self._callable(args, kwargs)
+        return self.callable(args, kwargs)
 
     def __repr__(self):
-        return '<%s %s -> %s>' % (self.__class__.__name__, self.parameters,
-                                  self.return_type)
+        return '<%s (%s) %s -> %s>' % (self.__class__.__name__, self.callable,
+                                       self.parameters, self.return_type)
 
 
 class ExceptionHandler(Dispatchable):
@@ -360,22 +381,28 @@ class ExceptionHandler(Dispatchable):
     exceptions it should handle and additional arbitrary configuration
     parameters that can be used to further specify details of exception handling.
 
-    Attributes (TODO: describe):
-        exc_type (type)
-        attrs (AttributeScope)
-        parameters (List[DispatchParam])
-        return_type (type)
-        _callable (Callable)
+    Attributes:
+        exc_type (type) - Type of exceptions the handler handles
+        attrs (AttributeScope) - Arbitrary configuration parameters for
+            the exception handler
+        parameters (List[DispatchParam]) - Descriptions of exception handler
+            callable' parameters
+        return_type (type) - Return type of exception handler
+        _callable (Callable) - Actual callable which will handle the exception
     """
 
     __slots__ = ['exc_type', 'attrs']
 
     def __init__(self, exc_type: type, exc_handler: Callable,
                  config_params: AttributeScope):
-        super().__init__(exc_handler)
-
+        self.callable = exc_handler
         self.exc_type = exc_type
         self.attrs = config_params
+        
+        disp = super().from_signature(exc_handler)
+
+        self.parameters = disp.parameters
+        self.return_type = disp.return_type
 
     def __eq__(self, other):
         return self._cmp(other) == 0
@@ -401,7 +428,7 @@ class ExceptionHandler(Dispatchable):
 
     def _cmp(self, other) -> int:
         tcmp = _util_cmp(self.exc_type, other.exc_type)
-        return tcmp if tcmp != 0 else _util_cmp(self._callable, other._callable)
+        return tcmp if tcmp != 0 else _util_cmp(self.callable, other.callable)
 
 
 # class SortedPriorityList:
@@ -435,6 +462,30 @@ class ExceptionHandler(Dispatchable):
 #     pass
 
 
+# Decorators
+
+
+def dispatchable(parameters: list=None, return_type: type=None):
+    """Decorator for manual definition of callable's params and return type.
+    
+    Takes the decorated callable and wraps it into a Dispatchable, recording the
+    expected parameters and return type definitions. Callable's parameters
+    should be specified as a list of tuples:
+        `(param_name, param_type, [default_value])`
+
+    Args:
+        parameters (List[Tuple]) - Descriptions of callable's parameters
+        return_type (type) - Return type of the callable
+    """
+    processed_params = []
+    for name, type_, *default in parameters:
+        processed_params.append(DispatchParam(name, type_, default or _MISSING))
+    
+    def decorator(f: Callable) -> Dispatchable:
+        return Dispatchable(f, processed_params, return_type)
+    return decorator
+
+
 # Utility functions
 
 def join_urls(*urls) -> str:
@@ -455,7 +506,7 @@ def join_urls(*urls) -> str:
     return leading + ('/'.join(u.strip('/') for u in urls)) + trailing
 
 
-def exc_type_cmp(exc_type1, exc_type2):
+def exc_type_cmp(exc_type1: type, exc_type2: type):
     """Compare two exception types.
 
     Standard comparison function returning -1, 0 or 1. Tests if one type is a
@@ -480,7 +531,7 @@ def _util_cmp(x, y):
     return 0 if x == y else (-1 if x < y else 1)
 
 
-def camel_case_split(identifier):
-    """Split a camelcase-capitalized string"""
+def camel_case_split(identifier: str) -> list:
+    """Split a camelcase-capitalized string into its sections"""
     matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
     return [m.group(0) for m in matches]
